@@ -1,0 +1,275 @@
+name: Build APK
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Compilar APK
+        run: |
+          mkdir -p www
+          cat > package.json <<'EOF'
+          {
+            "name": "granjas",
+            "version": "1.0.0",
+            "private": true,
+            "dependencies": {
+              "@capacitor/core": "^6.1.0",
+              "@capacitor/android": "^6.1.0",
+              "@capacitor/cli": "^6.1.0",
+              "@capacitor/filesystem": "^6.0.0"
+            }
+          }
+          EOF
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.granjas.mantenimiento",
+            "appName": "Granjas",
+            "webDir": "www"
+          }
+          EOF
+          cat > www/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="es"><head><meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+          <title>Granjas</title>
+          <style>
+          :root{--bg:#EEF1F5;--c:#fff;--ink:#12202F;--mut:#5d6b7a;--ln:#d5dce4;--acc:#E8A33D;--bad:#d64541;--ok:#1f9d57;--wa:#e0a100;--na:#9aa5b1;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+          @media(prefers-color-scheme:dark){:root{--bg:#0f1620;--c:#18222f;--ink:#e8edf3;--mut:#93a1b0;--ln:#2a3746}}
+          *{box-sizing:border-box}
+          body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,sans-serif}
+          header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:#12202F;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:10px}
+          header h1{margin:0;font-size:19px;flex:1}
+          header small{color:#f3c677;font-size:12px}
+          header button{background:none;border:1px solid #556;color:#fff;border-radius:8px;padding:6px 10px;font-size:13px}
+          main{padding:14px;max-width:640px;margin:0 auto}
+          .card{background:var(--c);border:1px solid var(--ln);border-radius:10px;padding:12px;margin-bottom:12px}
+          h2{font-size:18px;margin:0 0 8px}
+          label{display:block;font-size:13px;color:var(--mut);margin:8px 0 3px}
+          input,textarea{width:100%;padding:11px;border:1px solid var(--ln);border-radius:8px;background:var(--bg);color:var(--ink);font:16px system-ui,sans-serif}
+          .row{display:flex;gap:8px;align-items:center}.row>*{flex:1}.row>.fit{flex:none}
+          .b{background:var(--acc);color:#12202F;border:0;border-radius:8px;padding:13px 14px;font:700 16px system-ui,sans-serif;width:100%;margin-top:8px}
+          .b.s{background:transparent;border:1px solid var(--ln);color:var(--ink);font-weight:600}
+          .b.fit{width:auto;margin:0}
+          .chip{flex:1;display:flex;align-items:center;gap:8px;padding:12px;border:1px solid var(--ln);border-radius:8px;background:var(--c);color:var(--ink);font:600 15px system-ui,sans-serif}
+          .dot{width:14px;height:14px;border-radius:50%;background:var(--na);flex:none}
+          .ok{background:var(--ok)}.wa{background:var(--wa)}.bad{background:var(--bad)}
+          .mut,small{color:var(--mut);font-size:13px}
+          .line{padding:9px 0;border-top:1px solid var(--ln)}.line:first-of-type{border-top:0}
+          .pend{color:var(--wa);font-size:12px;font-weight:700}
+          #scanbox{display:none;position:sticky;top:calc(env(safe-area-inset-top,0px) + 50px);z-index:4;background:#000;padding:8px}
+          #sh{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;display:none;overflow:auto;padding:14px}
+          #sh .card{max-width:520px;margin:0 auto}
+          #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:#12202F;color:#fff;padding:11px 16px;border-radius:10px;z-index:30;display:none;max-width:90%;text-align:center}
+          #toast.bad{background:var(--bad)}
+          </style></head>
+          <body>
+          <header><h1>Granjas</h1><small id="st"></small><button id="out" style="display:none">Salir</button></header>
+          <div id="scanbox"><div id="reader"></div><button class="b s" id="stopscan" style="color:#fff">Cerrar cámara</button></div>
+          <main id="app"></main>
+          <div id="sh"></div><div id="toast"></div>
+          <script src="firebase-app-compat.js"></script>
+          <script src="firebase-auth-compat.js"></script>
+          <script src="firebase-firestore-compat.js"></script>
+          <script src="qrcode.min.js"></script>
+          <script src="html5-qrcode.min.js"></script>
+          <script>
+          firebase.initializeApp({apiKey:"AIzaSyAIEVVLabksP3BsYKozMuCQNTWcWHW9bKo",authDomain:"control-mantenimiento-b12e0.firebaseapp.com",projectId:"control-mantenimiento-b12e0",storageBucket:"control-mantenimiento-b12e0.firebasestorage.app",messagingSenderId:"344981212722",appId:"1:344981212722:web:af69c53ba227b89765f62b"});
+          var auth=firebase.auth(),db=firebase.firestore();
+          db.enablePersistence({synchronizeTabs:false}).catch(function(){});
+          var G=[],R=[],U=null,V={n:'home'},un=[],sh=null;
+          var EQ={solar:'Solar',grupo:'Grupo electrógeno'},TL={mantenimiento:'Mantenimiento',servicio:'Servicio de motor'};
+          var $=function(s){return document.querySelector(s)};
+          function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+          var tt;function toast(m,bad){var t=$('#toast');t.textContent=m;t.className=bad?'bad':'';t.style.display='block';clearTimeout(tt);tt=setTimeout(function(){t.style.display='none'},2200)}
+          function hoy(){var d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
+          function fd(f){var p=f.split('-');return p[2]+'/'+p[1]+'/'+p[0]}
+          function dias(f){return Math.floor((Date.now()-new Date(f+'T12:00:00').getTime())/864e5)}
+          function last(g,e,t){for(var i=0;i<R.length;i++){var r=R[i];if(r.granja==g&&r.equipo==e&&(!t||r.tipo==t))return r}}
+          var RK={na:0,ok:1,wa:2,bad:3},RN=['na','ok','wa','bad'];
+          function est(g,e){
+            var l=last(g,e,'mantenimiento'),c='na',ls=[];
+            if(!l)ls.push('Sin mantenimientos registrados');
+            else{var d=dias(l.fecha),k=d<23?'ok':d<=30?'wa':'bad';c=k;ls.push('Último mantenimiento: '+fd(l.fecha)+' (hace '+d+' d)')}
+            if(e=='grupo'){
+              var s=last(g,e,'servicio'),h=null;for(var i=0;i<R.length;i++){if(R[i].granja==g&&R[i].equipo==e&&R[i].horas!=null){h=R[i].horas;break}}
+              if(!s||s.horas==null)ls.push('Sin servicio de motor registrado');
+              else{var u=(h==null?s.horas:h)-s.horas,k2=u>=500?'bad':u>=450?'wa':'ok';if(RK[k2]>RK[c])c=k2;ls.push('Servicio de motor: '+u+' / 500 hs desde el último ('+fd(s.fecha)+')')}
+              if(h!=null)ls.push('Horómetro actual: '+h+' hs');
+            }
+            return{c:c,ls:ls};
+          }
+          /* datos */
+          function unsub(){un.forEach(function(f){f()});un=[]}
+          function listen(){unsub();
+            un.push(db.collection('granjas').onSnapshot(function(s){G=s.docs.map(function(d){return d.data()}).sort(function(a,b){return a.numero-b.numero});render()},function(){}));
+            un.push(db.collection('registros').onSnapshot({includeMetadataChanges:true},function(s){R=s.docs.map(function(d){var x=d.data();x.id=d.id;x.pend=d.metadata.hasPendingWrites;return x}).sort(function(a,b){return a.fecha<b.fecha?1:a.fecha>b.fecha?-1:b.ts-a.ts});render()},function(){}));
+          }
+          auth.onAuthStateChanged(function(u){U=u;if(u)listen();else{unsub();G=[];R=[]}render()});
+          /* vistas */
+          function render(){
+            var p=R.filter(function(r){return r.pend}).length;
+            $('#st').textContent=(navigator.onLine?'':'Sin conexión')+(p?(navigator.onLine?'':' · ')+p+' sin sincronizar':'');
+            $('#out').style.display=U?'block':'none';
+            if(sh)return;
+            var h=!U?vLogin():V.n=='eq'?vEq():vHome();
+            $('#app').innerHTML=h;
+            if(U&&V.n=='eq'){var q=$('#qr');if(q&&window.QRCode)new QRCode(q,{text:'granja:'+V.g+':'+V.e,width:170,height:170})}
+          }
+          function vLogin(){return '<div class="card"><h2>Ingresar</h2><label for="em">Correo</label><input id="em" type="email" autocomplete="username"><label for="pw">Contraseña</label><input id="pw" type="password" autocomplete="current-password"><button class="b" data-a="login">Ingresar</button></div>'}
+          function vHome(){
+            var h='<button class="b" data-a="scan" style="margin:0 0 12px">Escanear QR</button>';
+            G.forEach(function(g){
+              h+='<div class="card"><h2>Granja '+g.numero+'</h2><div class="row">';
+              ['solar','grupo'].forEach(function(e){h+='<button class="chip" data-a="eq" data-g="'+g.numero+'" data-e="'+e+'"><i class="dot '+est(g.numero,e).c+'"></i>'+(e=='solar'?'Solar':'Grupo')+'</button>'});
+              h+='</div></div>';
+            });
+            if(!G.length)h+='<p class="mut">Todavía no hay granjas. Agregá la primera.</p>';
+            h+='<div class="card"><h2>Agregar granja</h2><div class="row"><input id="ng" inputmode="numeric" placeholder="N° de granja"><button class="b fit" data-a="addg" style="margin:0">Agregar</button></div></div>';
+            if(G.length)h+='<button class="b s" data-a="qrall">Guardar QR de todas las granjas</button>';
+            return h;
+          }
+          function vEq(){
+            var g=V.g,e=V.e,s=est(g,e);
+            var h='<button class="b s" data-a="back" style="margin:0 0 12px">← Volver</button><div class="card"><h2><i class="dot '+s.c+'" style="display:inline-block;vertical-align:middle;margin-right:8px"></i>Granja '+g+' – '+EQ[e]+'</h2>'+s.ls.map(function(x){return '<div class="mut">'+esc(x)+'</div>'}).join('')+
+            '<button class="b" data-a="reg" data-t="mantenimiento">Mantenimiento realizado</button>'+(e=='grupo'?'<button class="b" data-a="reg" data-t="servicio">Servicio de motor</button>':'')+'</div>';
+            h+='<div class="card"><h2>Historial</h2>';
+            var hs=R.filter(function(r){return r.granja==g&&r.equipo==e});
+            if(!hs.length)h+='<p class="mut">Sin registros.</p>';
+            hs.forEach(function(r){h+='<div class="line"><b>'+fd(r.fecha)+' · '+(TL[r.tipo]||r.tipo)+'</b>'+(r.pend?' <span class="pend">sin sincronizar</span>':'')+'<br><small>'+esc(r.por||'')+(r.horas!=null?' · '+r.horas+' hs':'')+'</small>'+
+              [['obs','Observaciones'],['otro','Otro trabajo'],['fe','Fallo encontrado'],['fs','Fallo solucionado']].map(function(k){return r[k[0]]?'<div>'+k[1]+': '+esc(r[k[0]])+'</div>':''}).join('')+'</div>'});
+            h+='</div><div class="card"><h2>Código QR</h2><div id="qr"></div><button class="b s" data-a="qr">Guardar QR en Documentos</button></div>';
+            return h;
+          }
+          /* registro */
+          function openSh(t){
+            sh=t;var e=V.e,l=last(V.g,e),hp=l&&l.horas!=null?'Último: '+l.horas+' hs':'';
+            var h='<div class="card"><h2>'+TL[t]+' – Granja '+V.g+' '+EQ[V.e]+'</h2><label for="f">Fecha</label><input id="f" type="date" value="'+hoy()+'">';
+            if(e=='grupo')h+='<label for="hs">Horómetro (hs) *</label><input id="hs" inputmode="decimal" placeholder="'+hp+'">';
+            h+='<label for="o1">Observaciones (opcional)</label><textarea id="o1" rows="2"></textarea><label for="o2">Otro trabajo realizado (opcional)</label><textarea id="o2" rows="2"></textarea><label for="o3">Fallo encontrado (opcional)</label><textarea id="o3" rows="2"></textarea><label for="o4">Fallo solucionado (opcional)</label><textarea id="o4" rows="2"></textarea><button class="b" data-a="save">Guardar</button><button class="b s" data-a="cancel">Cancelar</button></div>';
+            $('#sh').innerHTML=h;$('#sh').style.display='block';
+          }
+          function closeSh(){sh=null;$('#sh').style.display='none';render()}
+          function saveReg(){
+            var f=$('#f').value;if(!f){toast('Falta la fecha',1);return}
+            var o={granja:V.g,equipo:V.e,tipo:sh,fecha:f,ts:Date.now(),por:U.email,obs:$('#o1').value.trim(),otro:$('#o2').value.trim(),fe:$('#o3').value.trim(),fs:$('#o4').value.trim()};
+            if(V.e=='grupo'){var hs=parseFloat(String($('#hs').value).replace(',','.'));if(isNaN(hs)){toast('Cargá el horómetro',1);return}o.horas=hs}
+            db.collection('registros').add(o).catch(function(x){toast('Error: '+x.message,1)});
+            var off=!navigator.onLine;closeSh();toast(off?'Guardado. Se sincroniza al volver la señal':'Guardado');
+          }
+          /* QR */
+          function FS(){return window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.Filesystem}
+          function qrPng(g,e){return new Promise(function(ok){
+            var d=document.createElement('div');new QRCode(d,{text:'granja:'+g+':'+e,width:400,height:400});
+            setTimeout(function(){var s=d.querySelector('canvas'),c=document.createElement('canvas');c.width=480;c.height=570;var x=c.getContext('2d');
+              x.fillStyle='#fff';x.fillRect(0,0,480,570);x.drawImage(s,40,20,400,400);x.fillStyle='#000';x.textAlign='center';
+              x.font='bold 42px sans-serif';x.fillText('Granja '+g,240,485);x.font='34px sans-serif';x.fillText(EQ[e],240,535);
+              ok(c.toDataURL('image/png').split(',')[1])},80)})}
+          function qrSave(g,e){return qrPng(g,e).then(function(b){var f=FS();if(!f)throw new Error('Solo en la app instalada');
+            return f.writeFile({path:'Granjas/QR/granja-'+('0'+g).slice(-2)+'-'+e+'.png',data:b,directory:'DOCUMENTS',recursive:true})})}
+          function qrPerm(){var f=FS();return f?f.requestPermissions().catch(function(){}):Promise.resolve()}
+          /* escáner */
+          var sc=null;
+          function startScan(){stopScan(1);$('#scanbox').style.display='block';
+            var F=Html5QrcodeSupportedFormats;sc=new Html5Qrcode('reader',{formatsToSupport:[F.QR_CODE],verbose:false});
+            sc.start({facingMode:'environment'},{fps:10,qrbox:{width:230,height:230}},function(t){
+              if(!sc)return;var m=/^granja:(\d+):(solar|grupo)$/.exec(t);if(!m){return}
+              stopScan();V={n:'eq',g:+m[1],e:m[2]};try{navigator.vibrate&&navigator.vibrate(40)}catch(x){}render();window.scrollTo(0,0)
+            },function(){}).catch(function(){toast('No se pudo abrir la cámara',1);$('#scanbox').style.display='none'})}
+          function stopScan(k){var s=sc;sc=null;if(s)s.stop().then(function(){s.clear()}).catch(function(){});if(!k)$('#scanbox').style.display='none'}
+          $('#stopscan').onclick=function(){stopScan()};
+          /* eventos */
+          $('#out').onclick=function(){if(confirm('¿Cerrar sesión?'))auth.signOut()};
+          $('#sh').onclick=function(e){var a=e.target.dataset.a;if(a=='save')saveReg();else if(a=='cancel')closeSh()};
+          $('#app').onclick=function(e){
+            var el=e.target.closest('[data-a]');if(!el)return;var a=el.dataset.a;
+            if(a=='login'){auth.signInWithEmailAndPassword($('#em').value.trim(),$('#pw').value).catch(function(x){toast(x.code=='auth/network-request-failed'?'Sin conexión: se necesita señal para el primer ingreso':'Correo o contraseña incorrectos',1)})}
+            else if(a=='scan')startScan();
+            else if(a=='eq'){V={n:'eq',g:+el.dataset.g,e:el.dataset.e};render();window.scrollTo(0,0)}
+            else if(a=='back'){V={n:'home'};render()}
+            else if(a=='reg')openSh(el.dataset.t);
+            else if(a=='addg'){var n=parseInt($('#ng').value,10);if(!n||n<1){toast('Poné un número válido',1);return}
+              if(G.some(function(g){return g.numero==n})){toast('Esa granja ya existe',1);return}
+              db.collection('granjas').doc(String(n)).set({numero:n}).catch(function(x){toast('Error: '+x.message,1)});toast('Granja '+n+' agregada')}
+            else if(a=='qr'){qrPerm().then(function(){return qrSave(V.g,V.e)}).then(function(){toast('QR guardado en Documentos/Granjas/QR')}).catch(function(x){toast(x.message||'No se pudo guardar',1)})}
+            else if(a=='qrall'){qrPerm().then(function(){var p=Promise.resolve();G.forEach(function(g){['solar','grupo'].forEach(function(e){p=p.then(function(){return qrSave(g.numero,e)})})});return p}).then(function(){toast('QR guardados en Documentos/Granjas/QR')}).catch(function(x){toast(x.message||'No se pudo guardar',1)})}
+          };
+          window.addEventListener('online',render);window.addEventListener('offline',render);
+          render();
+          </script></body></html>
+          EOF
+          for f in app auth firestore; do curl -fsSL https://www.gstatic.com/firebasejs/10.14.1/firebase-$f-compat.js -o www/firebase-$f-compat.js; done
+          curl -fsSL https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js -o www/qrcode.min.js
+          curl -fsSL https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js -o www/html5-qrcode.min.js
+          npm install
+          npx cap add android
+          npx cap sync android
+          sed -i 's#</manifest>#<uses-permission android:name="android.permission.CAMERA"/><uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/><uses-feature android:name="android.hardware.camera" android:required="false"/></manifest>#' android/app/src/main/AndroidManifest.xml
+          mkdir -p ~/.android
+          base64 -d > ~/.android/debug.keystore <<'EOF'
+          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
+          EOF
+          cd android && chmod +x gradlew && ./gradlew assembleDebug
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: Granjas ${{ github.run_number }}
+          files: android/app/build/outputs/apk/debug/app-debug.apk
