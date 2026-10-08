@@ -1,0 +1,487 @@
+name: Build APK
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Compilar APK
+        run: |
+          mkdir -p www
+          cat > package.json <<'EOF'
+          {
+            "name": "granjas",
+            "version": "1.0.0",
+            "private": true,
+            "dependencies": {
+              "@capacitor/core": "^6.1.0",
+              "@capacitor/android": "^6.1.0",
+              "@capacitor/cli": "^6.1.0",
+              "@capacitor/filesystem": "^6.0.0",
+              "@capacitor/share": "^6.0.0"
+            }
+          }
+          EOF
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.granjas.mantenimiento",
+            "appName": "Granjas",
+            "webDir": "www"
+          }
+          EOF
+          cat > www/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="es"><head><meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+          <title>Granjas</title>
+          <style>
+          :root{--bg:#EEF1F5;--c:#fff;--ink:#12202F;--mut:#5d6b7a;--ln:#d5dce4;--acc:#E8A33D;--bad:#d64541;--ok:#1f9d57;--wa:#e0a100;--na:#9aa5b1;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+          @media(prefers-color-scheme:dark){:root{--bg:#0f1620;--c:#18222f;--ink:#e8edf3;--mut:#93a1b0;--ln:#2a3746}}
+          *{box-sizing:border-box}
+          body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,sans-serif}
+          header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:#12202F;color:#fff;padding:12px 14px;display:flex;align-items:center;gap:10px}
+          header h1{margin:0;font-size:19px;flex:1}
+          header small{color:#f3c677;font-size:12px}
+          header button{background:none;border:1px solid #556;color:#fff;border-radius:8px;padding:6px 10px;font-size:13px}
+          main{padding:14px;max-width:640px;margin:0 auto}
+          .card{background:var(--c);border:1px solid var(--ln);border-radius:10px;padding:12px;margin-bottom:12px}
+          h2{font-size:18px;margin:0 0 8px}
+          label{display:block;font-size:13px;color:var(--mut);margin:8px 0 3px}
+          input,textarea,select{width:100%;padding:11px;border:1px solid var(--ln);border-radius:8px;background:var(--bg);color:var(--ink);font:16px system-ui,sans-serif}
+          .row{display:flex;gap:8px;align-items:center}.row>*{flex:1}.row>.fit{flex:none}
+          .b{background:var(--acc);color:#12202F;border:0;border-radius:8px;padding:13px 14px;font:700 16px system-ui,sans-serif;width:100%;margin-top:8px}
+          .b.s{background:transparent;border:1px solid var(--ln);color:var(--ink);font-weight:600}
+          .b.fit{width:auto;margin:0}
+          .chip{flex:1;display:flex;align-items:center;gap:8px;padding:12px;border:1px solid var(--ln);border-radius:8px;background:var(--c);color:var(--ink);font:600 15px system-ui,sans-serif}
+          .dot{width:14px;height:14px;border-radius:50%;background:var(--na);flex:none}
+          .ok{background:var(--ok)}.wa{background:var(--wa)}.bad{background:var(--bad)}
+          .mut,small{color:var(--mut);font-size:13px}
+          .line{padding:9px 0;border-top:1px solid var(--ln)}.line:first-of-type{border-top:0}
+          .pend{color:var(--wa);font-size:12px;font-weight:700}
+          #scanbox{display:none;position:sticky;top:calc(env(safe-area-inset-top,0px) + 50px);z-index:4;background:#000;padding:8px}
+          #sh{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:20;display:none;overflow:auto;padding:14px}
+          #sh .card{max-width:520px;margin:0 auto}
+          #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:#12202F;color:#fff;padding:11px 16px;border-radius:10px;z-index:30;display:none;max-width:90%;text-align:center}
+          #toast.bad{background:var(--bad)}
+          </style></head>
+          <body>
+          <header><h1>Granjas <small>v__BUILD__</small></h1><small id="st"></small><button id="out" style="display:none">Salir</button></header>
+          <div id="scanbox"><div id="reader"></div><button class="b s" id="stopscan" style="color:#fff">Cerrar cámara</button></div>
+          <main id="app"></main>
+          <div id="sh"></div><div id="toast"></div>
+          <script src="firebase-app-compat.js"></script>
+          <script src="firebase-auth-compat.js"></script>
+          <script src="firebase-firestore-compat.js"></script>
+          <script src="qrcode.min.js"></script>
+          <script src="html5-qrcode.min.js"></script>
+          <script src="jspdf.umd.min.js"></script>
+          <script>
+          firebase.initializeApp({apiKey:"AIzaSyAIEVVLabksP3BsYKozMuCQNTWcWHW9bKo",authDomain:"control-mantenimiento-b12e0.firebaseapp.com",projectId:"control-mantenimiento-b12e0",storageBucket:"control-mantenimiento-b12e0.firebasestorage.app",messagingSenderId:"344981212722",appId:"1:344981212722:web:af69c53ba227b89765f62b"});
+          var auth=firebase.auth(),db=firebase.firestore();
+          db.enablePersistence({synchronizeTabs:false}).catch(function(){});
+          var G=[],R=[],F={},RP=[],U=null,V={n:'home'},un=[],sh=null;
+          var EQ={solar:'Solar',grupo:'Grupo electrógeno'},TL={mantenimiento:'Mantenimiento',servicio:'Servicio de motor'};
+          var $=function(s){return document.querySelector(s)};
+          function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+          var tt;function toast(m,bad){var t=$('#toast');t.textContent=m;t.className=bad?'bad':'';t.style.display='block';clearTimeout(tt);tt=setTimeout(function(){t.style.display='none'},2200)}
+          function hoy(){var d=new Date();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)}
+          function fd(f){var p=f.split('-');return p[2]+'/'+p[1]+'/'+p[0]}
+          function dias(f){return Math.floor((Date.now()-new Date(f+'T12:00:00').getTime())/864e5)}
+          function last(g,e,t){for(var i=0;i<R.length;i++){var r=R[i];if(r.granja==g&&r.equipo==e&&(!t||r.tipo==t))return r}}
+          var RK={na:0,ok:1,wa:2,bad:3},RN=['na','ok','wa','bad'];
+          function est(g,e){
+            var l=last(g,e,'mantenimiento'),c='na',ls=[];
+            if(!l)ls.push('Sin mantenimientos registrados');
+            else{var d=dias(l.fecha),k=d<23?'ok':d<=30?'wa':'bad';c=k;ls.push('Último mantenimiento: '+fd(l.fecha)+' (hace '+d+' d)')}
+            if(e=='grupo'){
+              var s=last(g,e,'servicio'),h=null;for(var i=0;i<R.length;i++){if(R[i].granja==g&&R[i].equipo==e&&R[i].horas!=null){h=R[i].horas;break}}
+              if(!s||s.horas==null)ls.push('Sin servicio de motor registrado');
+              else{var u=(h==null?s.horas:h)-s.horas,k2=u>=500?'bad':u>=450?'wa':'ok';if(RK[k2]>RK[c])c=k2;ls.push('Servicio de motor: '+u+' / 500 hs desde el último ('+fd(s.fecha)+')')}
+              if(h!=null)ls.push('Horómetro actual: '+h+' hs');
+              var nb=0,cc='na';items(g,e,'comp').forEach(function(x){var k3=cst(x,h).c;if(k3=='bad')nb++;if(RK[k3]>RK[cc])cc=k3});
+              if(RK[cc]>RK[c])c=cc;if(nb)ls.push(nb+(nb>1?' componentes vencidos':' componente vencido'));
+            }
+            return{c:c,ls:ls};
+          }
+          /* datos */
+          function unsub(){un.forEach(function(f){f()});un=[]}
+          function listen(){unsub();
+            un.push(db.collection('granjas').onSnapshot(function(s){G=s.docs.map(function(d){return d.data()}).sort(function(a,b){return a.numero-b.numero});render()},function(){}));
+            un.push(db.collection('registros').onSnapshot({includeMetadataChanges:true},function(s){R=s.docs.map(function(d){var x=d.data();x.id=d.id;x.pend=d.metadata.hasPendingWrites;return x}).sort(function(a,b){return a.fecha<b.fecha?1:a.fecha>b.fecha?-1:b.ts-a.ts});render()},function(){}));
+            un.push(db.collection('fichas').onSnapshot(function(s){F={};s.docs.forEach(function(d){F[d.id]=d.data()});render()},function(){}));
+            un.push(db.collection('repuestos').onSnapshot(function(s){RP=s.docs.map(function(d){var x=d.data();x.id=d.id;return x}).sort(function(a,b){return String(a.nombre).localeCompare(String(b.nombre))});render()},function(){}));
+          }
+          auth.onAuthStateChanged(function(u){U=u;if(u)listen();else{unsub();G=[];R=[]}render()});
+          /* vistas */
+          function render(){
+            var p=R.filter(function(r){return r.pend}).length;
+            $('#st').textContent=(navigator.onLine?'':'Sin conexión')+(p?(navigator.onLine?'':' · ')+p+' sin sincronizar':'');
+            $('#out').style.display=U?'block':'none';
+            if(sh)return;
+            var h=!U?vLogin():V.n=='eq'?vEq():V.n=='panel'?vPanel():V.n=='stock'?vStock():V.n=='pdf'?vPdf():vHome();
+            $('#app').innerHTML=h;
+            if(U&&V.n=='eq'){var q=$('#qr');if(q&&window.QRCode)new QRCode(q,{text:'granja:'+V.g+':'+V.e,width:170,height:170})}
+          }
+          function vLogin(){return '<div class="card"><h2>Ingresar</h2><label for="em">Correo</label><input id="em" type="email" autocomplete="username"><label for="pw">Contraseña</label><input id="pw" type="password" autocomplete="current-password"><button class="b" data-a="login">Ingresar</button></div>'}
+          function vHome(){
+            var lw=RP.filter(low).length,h='<button class="b" data-a="scan" style="margin:0 0 12px">Escanear QR</button><div class="row" style="margin-bottom:12px"><button class="b s" data-a="go" data-v="panel" style="margin:0">Resumen</button><button class="b s" data-a="go" data-v="stock" style="margin:0">Repuestos'+(lw?' ('+lw+'!)':'')+'</button><button class="b s" data-a="go" data-v="pdf" style="margin:0">PDF</button></div>';
+            G.forEach(function(g){
+              h+='<div class="card"><div class="row"><h2 style="margin:0">Granja '+g.numero+(g.nombre?' <small>· '+esc(g.nombre)+'</small>':'')+'</h2><button class="b s fit" data-a="editg" data-g="'+g.numero+'" style="margin:0;padding:8px 12px;font-size:14px">Editar</button></div><div class="row" style="margin-top:10px">';
+              ['solar','grupo'].forEach(function(e){h+='<button class="chip" data-a="eq" data-g="'+g.numero+'" data-e="'+e+'"><i class="dot '+est(g.numero,e).c+'"></i>'+(e=='solar'?'Solar':'Grupo')+'</button>'});
+              h+='</div></div>';
+            });
+            if(!G.length)h+='<p class="mut">Todavía no hay granjas. Agregá la primera.</p>';
+            h+='<div class="card"><h2>Agregar granja</h2><input id="ng" inputmode="numeric" placeholder="N° de granja"><input id="nn" placeholder="Nombre o ubicación (opcional)" style="margin-top:8px"><button class="b" data-a="addg">Agregar</button></div>';
+            if(G.length)h+='<button class="b s" data-a="qrall">Guardar QR de todas las granjas</button>';
+            return h;
+          }
+          function vEq(){
+            var g=V.g,e=V.e,s=est(g,e);
+            var h='<button class="b s" data-a="back" style="margin:0 0 12px">← Volver</button><div class="card"><h2><i class="dot '+s.c+'" style="display:inline-block;vertical-align:middle;margin-right:8px"></i>Granja '+g+' – '+EQ[e]+'</h2>'+(gn(g)?'<div class="mut">'+esc(gn(g))+'</div>':'')+s.ls.map(function(x){return '<div class="mut">'+esc(x)+'</div>'}).join('')+
+            '<button class="b" data-a="reg" data-t="mantenimiento">Mantenimiento realizado</button>'+(e=='grupo'?'<button class="b" data-a="reg" data-t="servicio">Servicio de motor</button>':'')+'</div>';
+            h+=vFicha(g,e);h+='<div class="card"><h2>Historial</h2>';
+            var hs=R.filter(function(r){return r.granja==g&&r.equipo==e});
+            if(!hs.length)h+='<p class="mut">Sin registros.</p>';
+            hs.forEach(function(r){h+='<div class="line"><b>'+fd(r.fecha)+' · '+(TL[r.tipo]||r.tipo)+'</b>'+(r.pend?' <span class="pend">sin sincronizar</span>':'')+'<br><small>'+esc(r.por||'')+(r.horas!=null?' · '+r.horas+' hs':'')+'</small>'+
+              [['obs','Observaciones'],['otro','Otro trabajo'],['fe','Fallo encontrado'],['fs','Fallo solucionado'],['vb','Tensión de batería (V)'],['lv','Luz de válvulas (mm)'],['vc','Tensión de carga (V)']].map(function(k){return r[k[0]]?'<div>'+k[1]+': '+esc(r[k[0]])+'</div>':''}).join('')+(r.camb&&r.camb.length?'<div>Componentes cambiados: '+esc(r.camb.join(', '))+'</div>':'')+(r.rep&&r.rep.length?'<div>Repuestos usados: '+esc(r.rep.map(function(x){return x.n+' ×'+x.q}).join(', '))+'</div>':'')+'</div>'});
+            h+='</div><div class="card"><h2>Código QR</h2><div id="qr"></div><button class="b s" data-a="qr">Guardar QR en Documentos</button></div>';
+            return h;
+          }
+          /* registro */
+          function openSh(t){
+            sh=t;var e=V.e,l=last(V.g,e),hp=l&&l.horas!=null?'Último: '+l.horas+' hs':'';
+            var h='<div class="card"><h2>'+TL[t]+' – Granja '+V.g+' '+EQ[V.e]+'</h2><label for="f">Fecha</label><input id="f" type="date" value="'+hoy()+'">';
+            if(e=='grupo')h+='<label for="hs">Horómetro (hs) *</label><input id="hs" inputmode="decimal" placeholder="'+hp+'">';
+            h+=extra(t);if(e=='grupo')h+=usedBox();h+='<label for="o1">Observaciones (opcional)</label><textarea id="o1" rows="2"></textarea><label for="o2">Otro trabajo realizado (opcional)</label><textarea id="o2" rows="2"></textarea><label for="o3">Fallo encontrado (opcional)</label><textarea id="o3" rows="2"></textarea><label for="o4">Fallo solucionado (opcional)</label><textarea id="o4" rows="2"></textarea><button class="b" data-a="save">Guardar</button><button class="b s" data-a="cancel">Cancelar</button></div>';
+            $('#sh').innerHTML=h;$('#sh').style.display='block';
+          }
+          function closeSh(){sh=null;$('#sh').style.display='none';render()}
+          function saveReg(){
+            var f=$('#f').value;if(!f){toast('Falta la fecha',1);return}
+            var o={granja:V.g,equipo:V.e,tipo:sh,fecha:f,ts:Date.now(),por:U.email,obs:$('#o1').value.trim(),otro:$('#o2').value.trim(),fe:$('#o3').value.trim(),fs:$('#o4').value.trim()};
+            if(V.e=='grupo'){var hs=parseFloat(String($('#hs').value).replace(',','.'));if(isNaN(hs)){toast('Cargá el horómetro',1);return}o.horas=hs}
+            saveExtra(o,f);
+            db.collection('registros').add(o).catch(function(x){toast('Error: '+x.message,1)});
+            var off=!navigator.onLine;closeSh();toast(off?'Guardado. Se sincroniza al volver la señal':'Guardado');
+          }
+          function gn(n){var f=G.filter(function(x){return x.numero==n})[0];return f&&f.nombre?f.nombre:''}
+          function runOps(ops){for(var i=0;i<ops.length;i+=400){var b=db.batch();ops.slice(i,i+400).forEach(function(f){f(b)});b.commit().catch(function(x){toast('Error: '+x.message,1)})}}
+          function openFarm(n){
+            var f=G.filter(function(x){return x.numero==n})[0];if(!f)return;
+            sh='farm';V.ef=n;
+            $('#sh').innerHTML='<div class="card"><h2>Editar granja '+n+'</h2><label for="en">Número</label><input id="en" inputmode="numeric" value="'+n+'"><small>Si cambiás el número, el historial pasa a la nueva numeración y hay que volver a imprimir los QR de esta granja.</small><label for="enm">Nombre o ubicación</label><input id="enm" value="'+esc(f.nombre||'')+'"><button class="b" data-a="gsave">Guardar cambios</button><button class="b s" data-a="gdel" style="color:var(--bad);border-color:var(--bad)">Eliminar granja</button><button class="b s" data-a="cancel">Cancelar</button></div>';
+            $('#sh').style.display='block';
+          }
+          function saveFarm(){
+            var old=V.ef,n=parseInt($('#en').value,10),nm=$('#enm').value.trim();
+            if(!n||n<1){toast('Número inválido',1);return}
+            if(n!=old&&G.some(function(g){return g.numero==n})){toast('Ya existe la granja '+n,1);return}
+            var ops=[];
+            if(n==old)ops.push(function(b){b.set(db.collection('granjas').doc(String(old)),{numero:old,nombre:nm})});
+            else{
+              ops.push(function(b){b.set(db.collection('granjas').doc(String(n)),{numero:n,nombre:nm})});
+              ops.push(function(b){b.delete(db.collection('granjas').doc(String(old)))});
+              R.filter(function(r){return r.granja==old}).forEach(function(r){ops.push(function(b){b.update(db.collection('registros').doc(r.id),{granja:n})})});
+              ['solar','grupo'].forEach(function(e){var fo=F[fid(old,e)];if(fo){ops.push(function(b){b.set(db.collection('fichas').doc(fid(n,e)),fo)});ops.push(function(b){b.delete(db.collection('fichas').doc(fid(old,e)))})}});
+            }
+            runOps(ops);closeSh();toast(n==old?'Cambios guardados':'Granja renumerada. Reimprimí sus QR');
+          }
+          function delFarm(){
+            var old=V.ef,rs=R.filter(function(r){return r.granja==old});
+            if(!confirm('¿Eliminar la Granja '+old+' y sus '+rs.length+' registros? No se puede deshacer.'))return;
+            var ops=[function(b){b.delete(db.collection('granjas').doc(String(old)))}];
+            ['solar','grupo'].forEach(function(e){ops.push(function(b){b.delete(db.collection('fichas').doc(fid(old,e)))})});
+            rs.forEach(function(r){ops.push(function(b){b.delete(db.collection('registros').doc(r.id))})});
+            runOps(ops);closeSh();toast('Granja '+old+' eliminada');
+          }
+          /* fichas */
+          var FM=null,NUMF={q:1,stk:1,min:1,pot:1,cap:1,volt:1,vcarga:1,cant:1,horas:1,intHs:1,intMes:1,kva:1,aceiteL:1,refL:1,pCant:1,pPot:1};
+          var D='inputmode="decimal"',DT='type="date"';
+          var FD={
+           ds:[['pCant','Cantidad de paneles',D],['pPot','Potencia por panel (W)',D]],
+           inv:[['marca','Marca'],['modelo','Modelo'],['pot','Potencia (kW)',D],['serie','N° de serie'],['fecha','Fecha de instalación',DT]],
+           bat:[['tipo','Tipo (gel, litio, plomo…)'],['marca','Marca'],['modelo','Modelo'],['cap','Capacidad (Ah)',D],['volt','Voltaje (V)',D],['vcarga','Tensión de carga (V)',D],['serie','N° de serie'],['fecha','Fecha de instalación',DT]],
+           comp:[['nombre','Componente'],['ref','Referencia / modelo'],['cant','Cantidad',D],['fecha','Fecha del último cambio',DT],['horas','Horómetro en ese cambio (hs)',D],['intHs','Cambiar cada (hs)',D],['intMes','Cambiar cada (meses)',D]],
+           dg:[['marca','Marca'],['modelo','Modelo'],['kva','Potencia (kVA)',D],['comb','Combustible'],['serie','N° de serie'],['aceiteTipo','Aceite: tipo'],['aceiteL','Aceite: litros',D],['refTipo','Refrigerante: tipo'],['refL','Refrigerante: litros',D],['altFecha','Alternador: último cambio o reparación',DT],['altNota','Alternador: nota'],['arrFecha','Motor de arranque: último cambio o reparación',DT],['arrNota','Motor de arranque: nota']]
+          };
+          function fid(g,e){return g+'-'+e}
+          function fi(g,e){var f=F[fid(g,e)];return f&&f.items?f.items:{}}
+          function fdat(g,e){var f=F[fid(g,e)];return f&&f.datos?f.datos:{}}
+          function items(g,e,k){var it=fi(g,e);return Object.keys(it).map(function(i){var x=it[i];x.id=i;return x}).filter(function(x){return x.k==k}).sort(function(a,b){return(a.ord||0)-(b.ord||0)})}
+          function hor(g,e){for(var i=0;i<R.length;i++)if(R[i].granja==g&&R[i].equipo==e&&R[i].horas!=null)return R[i].horas;return null}
+          function cst(x,h){
+            var k='na',t=[];
+            if(x.intHs&&typeof x.horas=='number'&&h!=null){var r=Math.round(x.intHs-(h-x.horas));k=r<=0?'bad':r<=x.intHs*.1?'wa':'ok';t.push(r<=0?'Vencido por horas ('+(-r)+' hs)':'Faltan '+r+' hs')}
+            if(x.intMes&&x.fecha){var m=Math.round(x.intMes*30-dias(x.fecha)),k2=m<=0?'bad':m<=30?'wa':'ok';if(RK[k2]>RK[k])k=k2;t.push(m<=0?'Vencido por fecha (hace '+(-m)+' d)':'Faltan '+m+' d')}
+            return{c:k,t:t};
+          }
+          function il(x,h){
+            var j=function(a){return esc(a.filter(Boolean).join(' · '))};
+            if(x.k=='inv')return '<b>'+j([x.marca,x.modelo])+'</b><br><small>'+j([x.pot?x.pot+' kW':'','S/N '+(x.serie||'—'),x.fecha?'instalado '+fd(x.fecha):''])+'</small>';
+            if(x.k=='bat')return '<b>'+j([x.tipo,x.marca,x.modelo])+'</b><br><small>'+j([x.cap?x.cap+' Ah':'',x.volt?x.volt+' V':'',x.vcarga?'carga '+x.vcarga+' V':'','S/N '+(x.serie||'—'),x.fecha?'instalada '+fd(x.fecha):''])+'</small>';
+            var s=cst(x,h);
+            return '<i class="dot '+s.c+'" style="display:inline-block;vertical-align:middle;margin-right:6px"></i><b>'+esc(x.nombre)+'</b><br><small>'+j([x.ref,x.cant?'x'+x.cant:'',x.fecha?'cambio '+fd(x.fecha)+(typeof x.horas=='number'?' ('+x.horas+' hs)':''):'sin fecha de cambio'])+'</small><br><small>'+esc(s.t.join(' · ')||(x.intHs||x.intMes?'Falta fecha u horómetro del último cambio':'Sin intervalo cargado'))+'</small>';
+          }
+          function vFicha(g,e){
+            var h='<div class="card"><h2>Ficha</h2>',d=fdat(g,e),hh=hor(g,e);
+            var j=function(a){return esc(a.filter(Boolean).join(' · '))};
+            var L=function(a){return a.length?a.map(function(x){return '<div class="line" data-a="fedit" data-i="'+x.id+'">'+il(x,hh)+'</div>'}).join(''):'<p class="mut">Ninguno cargado.</p>'};
+            if(e=='solar'){
+              h+='<div class="mut">Paneles: '+(d.pCant?d.pCant+' × '+(d.pPot||'?')+' W':'sin datos')+'</div><button class="b s" data-a="fd" data-f="ds">Editar paneles</button>';
+              h+='<h2 style="margin-top:14px">Inversores</h2>'+L(items(g,e,'inv'))+'<button class="b s" data-a="fadd" data-k="inv">Agregar inversor</button>';
+              h+='<h2 style="margin-top:14px">Baterías</h2>'+L(items(g,e,'bat'))+'<button class="b s" data-a="fadd" data-k="bat">Agregar batería</button>';
+            }else{
+              var ln=[j([d.marca,d.modelo,d.kva?d.kva+' kVA':'',d.comb,d.serie?'S/N '+d.serie:'']),j([d.aceiteTipo||d.aceiteL?'Aceite':'',d.aceiteTipo,d.aceiteL?d.aceiteL+' L':'']),j([d.refTipo||d.refL?'Refrigerante':'',d.refTipo,d.refL?d.refL+' L':'']),j([d.altFecha?'Alternador: '+fd(d.altFecha):'',d.altNota]),j([d.arrFecha?'Arranque: '+fd(d.arrFecha):'',d.arrNota])];
+              h+=ln.filter(Boolean).map(function(x){return '<div class="mut">'+x+'</div>'}).join('')||'<p class="mut">Sin datos cargados.</p>';
+              h+='<button class="b s" data-a="fd" data-f="dg">Editar datos del grupo</button><h2 style="margin-top:14px">Componentes</h2>'+L(items(g,e,'comp'))+'<button class="b s" data-a="fadd" data-k="comp">Agregar componente</button>';
+              if(!items(g,e,'comp').length)h+='<button class="b s" data-a="fdef">Cargar componentes típicos</button>';
+            }
+            return h+'</div>';
+          }
+          function form(t,fs,v,sv,dl){
+            FM={fs:fs,sv:sv,dl:dl};sh='form';
+            var h='<div class="card"><h2>'+t+'</h2>';
+            fs.forEach(function(f){h+='<label for="x_'+f[0]+'">'+f[1]+'</label><input id="x_'+f[0]+'" '+(f[2]||'')+' value="'+esc(v[f[0]]==null?'':v[f[0]])+'">'});
+            h+='<button class="b" data-a="fsave">Guardar</button>'+(dl?'<button class="b s" data-a="fdel" style="color:var(--bad);border-color:var(--bad)">Eliminar</button>':'')+'<button class="b s" data-a="cancel">Cancelar</button></div>';
+            $('#sh').innerHTML=h;$('#sh').style.display='block';
+          }
+          function fSave(){var o={};FM.fs.forEach(function(f){var s=$('#x_'+f[0]).value.trim();if(NUMF[f[0]]&&s!==''){s=parseFloat(s.replace(',','.'));if(isNaN(s))s=''}o[f[0]]=s});var sv=FM.sv;closeSh();sv(o)}
+          function fDel(){if(confirm('¿Eliminar este elemento?')){var dl=FM.dl;closeSh();dl()}}
+          function nid(){return 'i'+Date.now().toString(36)+Math.floor(Math.random()*1e3)}
+          function fer(x){toast('Error: '+x.message,1)}
+          function saveItem(g,e,id,o){var d={items:{}};d.items[id]=o;db.collection('fichas').doc(fid(g,e)).set(d,{merge:true}).catch(fer)}
+          function editDatos(f){var g=V.g,e=V.e;form(f=='ds'?'Paneles':'Datos del grupo',FD[f],fdat(g,e),function(o){db.collection('fichas').doc(fid(g,e)).set({datos:o},{merge:true}).catch(fer)})}
+          function addItem(k){var g=V.g,e=V.e;form({inv:'Agregar inversor',bat:'Agregar batería',comp:'Agregar componente'}[k],FD[k],{},function(o){o.k=k;o.ord=Date.now();saveItem(g,e,nid(),o)})}
+          function editItem(id){var g=V.g,e=V.e,x=fi(g,e)[id];if(!x)return;form('Editar',FD[x.k],x,function(o){o.k=x.k;saveItem(g,e,id,o)},function(){var u={};u['items.'+id]=firebase.firestore.FieldValue.delete();db.collection('fichas').doc(fid(g,e)).update(u).catch(fer)})}
+          function defComps(){var g=V.g,e=V.e,d={items:{}},n=Date.now();[['Aceite',500,0],['Filtro de aceite',500,0],['Filtro de aire',500,0],['Filtro de combustible',500,0],['Correas',1000,24],['Bujías',1000,0],['Cables de bujía',2000,0]].forEach(function(c,i){d.items[nid()+i]={k:'comp',ord:n+i,nombre:c[0],intHs:c[1],intMes:c[2]||''}});db.collection('fichas').doc(fid(g,e)).set(d,{merge:true}).catch(fer)}
+          function extra(t){
+            var e=V.e,h='';
+            if(e=='solar')h+='<label for="o5">Tensión de batería medida (V) (opcional)</label><input id="o5" inputmode="decimal">';
+            else{
+              h+='<label for="o6">Luz de válvulas (mm) (opcional)</label><input id="o6" inputmode="decimal"><label for="o7">Tensión de carga (V) (opcional)</label><input id="o7" inputmode="decimal">';
+              if(t=='servicio'){var cs=items(V.g,e,'comp');if(cs.length){h+='<label>Componentes cambiados en este servicio</label>';cs.forEach(function(c){h+='<label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:16px;margin:4px 0"><input type="checkbox" class="cc" value="'+c.id+'" style="width:auto"> '+esc(c.nombre)+'</label>'})}}
+            }
+            return h;
+          }
+          function nv(id){var el=$(id);if(!el||!el.value.trim())return;var n=parseFloat(el.value.replace(',','.'));return isNaN(n)?undefined:n}
+          function saveExtra(o,f){
+            var uc=Object.keys(UT).filter(function(k){return UT[k]>0});
+            if(uc.length){o.rep=uc.map(function(k){var x=RP.filter(function(r){return r.id==k})[0];return{c:k,n:x?x.nombre:k,q:UT[k]}});uc.forEach(function(k){db.collection('repuestos').doc(k).update({stock:firebase.firestore.FieldValue.increment(-UT[k])}).catch(fer)})}
+            var a=nv('#o5'),b=nv('#o6'),c=nv('#o7');if(a!=null)o.vb=a;if(b!=null)o.lv=b;if(c!=null)o.vc=c;
+            var cs=[].slice.call(document.querySelectorAll('.cc:checked')).map(function(x){return x.value});
+            if(cs.length){var it=fi(o.granja,o.equipo),u={},nm=[];cs.forEach(function(id){u['items.'+id+'.fecha']=f;u['items.'+id+'.horas']=o.horas;nm.push(it[id].nombre)});o.camb=nm;db.collection('fichas').doc(fid(o.granja,o.equipo)).update(u).catch(fer)}
+          }
+          /* repuestos, resumen y PDF */
+          var UT={},BK='<button class="b s" data-a="back" style="margin:0 0 12px">← Volver</button>';
+          function low(x){return x.stock<=(x.min||0)}
+          function rp(c){return RP.filter(function(r){return r.id==c})[0]}
+          function usedBox(){UT={};return '<label>Repuestos usados</label><div id="usedl"><small class="mut">Ninguno</small></div><button class="b s" data-a="usescan">Escanear repuesto usado</button>'}
+          function renderUsed(){var k=Object.keys(UT).filter(function(c){return UT[c]>0});$('#usedl').innerHTML=k.length?k.map(function(c){var x=rp(c);return '<div class="row line"><div>'+esc(x?x.nombre:c)+'</div><div class="fit"><button class="b s fit" data-a="ud" data-c="'+esc(c)+'" style="padding:6px 12px">−</button> <b>'+UT[c]+'</b> <button class="b s fit" data-a="uu" data-c="'+esc(c)+'" style="padding:6px 12px">+</button></div></div>'}).join(''):'<small class="mut">Ninguno</small>'}
+          function barScan(c){
+            if(SU){SU=false;$('#sh').style.display='block';var x=rp(c);if(!x){toast('Repuesto '+c+' no cargado. Cargalo en Repuestos',1);return}UT[c]=(UT[c]||0)+1;renderUsed();toast(x.nombre+' ×'+UT[c]);return}
+            var y=rp(c);
+            if(y)form('Reponer: '+y.nombre,[['q','Cantidad que ingresa',D]],{q:1},function(o){if(o.q>0)db.collection('repuestos').doc(c).update({stock:firebase.firestore.FieldValue.increment(o.q)}).catch(fer)});
+            else newRep(c);
+          }
+          function newRep(c){form('Nuevo repuesto',[['codigo','Código de barras'],['nombre','Nombre / descripción'],['stk','Stock inicial',D],['min','Stock mínimo (aviso)',D]],{codigo:c,stk:0,min:1},function(o){if(!o.codigo||!o.nombre){toast('Faltó el código o el nombre',1);return}db.collection('repuestos').doc(String(o.codigo)).set({nombre:o.nombre,stock:o.stk===''?0:o.stk,min:o.min===''?0:o.min},{merge:true}).catch(fer)})}
+          function editRep(c){var x=rp(c);if(!x)return;form('Editar repuesto',[['nombre','Nombre'],['stk','Stock actual (ajustar)',D],['min','Stock mínimo',D]],{nombre:x.nombre,stk:x.stock,min:x.min},function(o){db.collection('repuestos').doc(c).update({nombre:o.nombre,stock:o.stk===''?0:o.stk,min:o.min===''?0:o.min}).catch(fer)},function(){db.collection('repuestos').doc(c).delete().catch(fer)})}
+          function vStock(){
+            var h=BK+'<button class="b" data-a="stscan" style="margin:0 0 12px">Escanear para reponer</button><button class="b s" data-a="stnew" style="margin:0 0 12px">Agregar repuesto a mano</button><div class="card"><h2>Repuestos ('+RP.length+')</h2>';
+            if(!RP.length)h+='<p class="mut">Todavía no cargaste repuestos.</p>';
+            RP.forEach(function(x){h+='<div class="line" data-a="stedit" data-i="'+esc(x.id)+'"><i class="dot '+(low(x)?'bad':'ok')+'" style="display:inline-block;vertical-align:middle;margin-right:6px"></i><b>'+esc(x.nombre)+'</b><br><small>'+esc(x.id)+' · Stock: <b>'+x.stock+'</b>'+(low(x)?' · stock bajo (mínimo '+(x.min||0)+')':'')+'</small></div>'});
+            return h+'</div>';
+          }
+          function vPanel(){
+            var L=[];G.forEach(function(g){['solar','grupo'].forEach(function(e){L.push({g:g.numero,e:e,s:est(g.numero,e)})})});
+            var n=function(c){return L.filter(function(x){return x.s.c==c}).length},dt=function(c){return '<i class="dot '+c+'" style="display:inline-block;vertical-align:middle;margin-right:6px"></i>'};
+            var fp=R.filter(function(r){return r.fe&&r.fest!='ok'}),fo=R.filter(function(r){return r.fe&&r.fest=='ok'}).slice(0,10);
+            var h=BK+'<div class="card"><h2>Resumen</h2><div>'+dt('bad')+'Vencidos: <b>'+n('bad')+'</b></div><div>'+dt('wa')+'Por vencer: <b>'+n('wa')+'</b></div><div>'+dt('na')+'Sin datos: <b>'+n('na')+'</b></div><div>'+dt('ok')+'Al día: <b>'+n('ok')+'</b></div><div style="margin-top:6px">Fallos pendientes: <b>'+fp.length+'</b></div></div>';
+            var at=L.filter(function(x){return x.s.c!='ok'}).sort(function(a,b){return RK[b.s.c]-RK[a.s.c]});
+            h+='<div class="card"><h2>Requieren atención</h2>'+(at.length?at.map(function(x){return '<div class="line" data-a="eq" data-g="'+x.g+'" data-e="'+x.e+'">'+dt(x.s.c)+'<b>Granja '+x.g+' – '+EQ[x.e]+'</b><br><small>'+esc(x.s.ls.join(' · '))+'</small></div>'}).join(''):'<p class="mut">Todo al día.</p>')+'</div>';
+            h+='<div class="card"><h2>Fallos pendientes</h2>'+(fp.length?fp.map(function(r){return '<div class="line"><b>Granja '+r.granja+' – '+EQ[r.equipo]+' · '+fd(r.fecha)+'</b><br>'+esc(r.fe)+'<br><button class="b s fit" data-a="fix" data-id="'+r.id+'" style="margin-top:6px;padding:8px 12px">Marcar solucionado</button></div>'}).join(''):'<p class="mut">Sin fallos pendientes.</p>')+'</div>';
+            if(fo.length)h+='<div class="card"><h2>Fallos solucionados (últimos)</h2>'+fo.map(function(r){return '<div class="line"><b>Granja '+r.granja+' – '+EQ[r.equipo]+' · '+fd(r.fecha)+'</b><br><small>'+esc(r.fe)+' · solucionado '+(r.fsf?fd(r.fsf):'')+'</small></div>'}).join('')+'</div>';
+            return h;
+          }
+          function vPdf(){
+            return BK+'<div class="card"><h2>Reporte en PDF</h2><label for="rg">Granja</label><select id="rg">'+G.map(function(g){return '<option value="'+g.numero+'">Granja '+g.numero+(g.nombre?' – '+esc(g.nombre):'')+'</option>'}).join('')+'</select><label for="rd">Desde (opcional)</label><input id="rd" type="date"><label for="rh">Hasta</label><input id="rh" type="date" value="'+hoy()+'"><button class="b" data-a="mkpdf">Generar y compartir PDF</button></div>';
+          }
+          function fichaTxt(g,e){
+            var d=fdat(g,e),h=hor(g,e),j=function(a){return a.filter(Boolean).join(' - ')},o=[];
+            if(e=='solar'){
+              if(d.pCant)o.push('Paneles: '+d.pCant+' x '+(d.pPot||'?')+' W');
+              items(g,e,'inv').forEach(function(x){o.push('Inversor: '+j([x.marca,x.modelo,x.pot?x.pot+' kW':'','S/N '+(x.serie||'-'),x.fecha?'instalado '+fd(x.fecha):'']))});
+              items(g,e,'bat').forEach(function(x){o.push('Batería: '+j([x.tipo,x.marca,x.modelo,x.cap?x.cap+' Ah':'',x.volt?x.volt+' V':'',x.vcarga?'carga '+x.vcarga+' V':'','S/N '+(x.serie||'-'),x.fecha?'instalada '+fd(x.fecha):'']))});
+            }else{
+              o.push(j([d.marca,d.modelo,d.kva?d.kva+' kVA':'',d.comb,d.serie?'S/N '+d.serie:'']));
+              if(d.aceiteTipo||d.aceiteL)o.push('Aceite: '+j([d.aceiteTipo,d.aceiteL?d.aceiteL+' L':'']));
+              if(d.refTipo||d.refL)o.push('Refrigerante: '+j([d.refTipo,d.refL?d.refL+' L':'']));
+              if(d.altFecha||d.altNota)o.push('Alternador: '+j([d.altFecha?fd(d.altFecha):'',d.altNota]));
+              if(d.arrFecha||d.arrNota)o.push('Motor de arranque: '+j([d.arrFecha?fd(d.arrFecha):'',d.arrNota]));
+              items(g,e,'comp').forEach(function(x){o.push('Componente: '+j([x.nombre,x.ref,x.cant?'x'+x.cant:'',x.fecha?'cambio '+fd(x.fecha)+(typeof x.horas=='number'?' ('+x.horas+' hs)':''):'sin fecha',cst(x,h).t.join(', ')]))});
+            }
+            return o.filter(Boolean);
+          }
+          function mkPdf(){
+            var g=+$('#rg').value,d1=$('#rd').value,d2=$('#rh').value;
+            if(!g){toast('Elegí una granja',1);return}
+            if(!window.jspdf){toast('No cargó el generador de PDF',1);return}
+            var doc=new jspdf.jsPDF({unit:'mm',format:'a4'}),y=15;
+            var P=function(t,b,sz){sz=sz||10;doc.setFont('helvetica',b?'bold':'normal');doc.setFontSize(sz);doc.splitTextToSize(String(t),180).forEach(function(l){if(y>282){doc.addPage();y=15}doc.text(l,15,y);y+=sz*.5+1.2})};
+            var f=G.filter(function(x){return x.numero==g})[0],K=[['obs','Observaciones'],['otro','Otro trabajo'],['fe','Fallo encontrado'],['fs','Fallo solucionado'],['vb','Tensión de batería (V)'],['lv','Luz de válvulas (mm)'],['vc','Tensión de carga (V)']];
+            P('Reporte de mantenimiento - Granja '+g+(f&&f.nombre?' ('+f.nombre+')':''),1,15);
+            P('Período: '+(d1?fd(d1):'desde el inicio')+' al '+(d2?fd(d2):'hoy')+' · Generado el '+fd(hoy()),0,9);y+=3;
+            ['solar','grupo'].forEach(function(e){
+              P(EQ[e],1,13);est(g,e).ls.forEach(function(l){P(l,0,9)});
+              var ft=fichaTxt(g,e);if(ft.length){y+=1;P('Ficha',1,10);ft.forEach(function(l){P(l,0,9)})}
+              y+=1;P('Historial',1,10);
+              var rs=R.filter(function(r){return r.granja==g&&r.equipo==e&&(!d1||r.fecha>=d1)&&(!d2||r.fecha<=d2)});
+              if(!rs.length)P('Sin registros en el período.',0,9);
+              rs.forEach(function(r){
+                P(fd(r.fecha)+' - '+(TL[r.tipo]||r.tipo)+(r.horas!=null?' - '+r.horas+' hs':'')+' - '+(r.por||''),1,9);
+                K.forEach(function(k){if(r[k[0]])P(k[1]+': '+r[k[0]],0,9)});
+                if(r.fe)P('Estado del fallo: '+(r.fest=='ok'?'solucionado'+(r.fsf?' el '+fd(r.fsf):''):'pendiente'),0,9);
+                if(r.camb&&r.camb.length)P('Componentes cambiados: '+r.camb.join(', '),0,9);
+                if(r.rep&&r.rep.length)P('Repuestos usados: '+r.rep.map(function(x){return x.n+' x'+x.q}).join(', '),0,9);
+              });
+              y+=5;
+            });
+            var name='reporte-granja-'+('0'+g).slice(-2)+'-'+hoy()+'.pdf',fs=FS();
+            if(!fs){doc.save(name);return}
+            var b64=doc.output('datauristring').split(',')[1];
+            qrPerm().then(function(){return fs.writeFile({path:'Granjas/Reportes/'+name,data:b64,directory:'DOCUMENTS',recursive:true})}).then(function(r){
+              toast('PDF guardado en Documentos/Granjas/Reportes');
+              var Sh=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.Share;
+              if(Sh)return Sh.share({title:'Reporte Granja '+g,files:[r.uri]}).catch(function(){});
+            }).catch(function(x){toast(x.message||'No se pudo guardar el PDF',1)});
+          }
+          /* QR */
+          function FS(){return window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.Filesystem}
+          function qrPng(g,e){return new Promise(function(ok){
+            var d=document.createElement('div');new QRCode(d,{text:'granja:'+g+':'+e,width:400,height:400});
+            setTimeout(function(){var s=d.querySelector('canvas'),c=document.createElement('canvas');c.width=480;c.height=570;var x=c.getContext('2d');
+              x.fillStyle='#fff';x.fillRect(0,0,480,570);x.drawImage(s,40,20,400,400);x.fillStyle='#000';x.textAlign='center';
+              x.font='bold 42px sans-serif';x.fillText('Granja '+g,240,485);x.font='34px sans-serif';x.fillText(EQ[e],240,535);
+              ok(c.toDataURL('image/png').split(',')[1])},80)})}
+          function qrSave(g,e){return qrPng(g,e).then(function(b){var f=FS();if(!f)throw new Error('Solo en la app instalada');
+            return f.writeFile({path:'Granjas/QR/granja-'+('0'+g).slice(-2)+'-'+e+'.png',data:b,directory:'DOCUMENTS',recursive:true})})}
+          function qrPerm(){var f=FS();return f?f.requestPermissions().catch(function(){}):Promise.resolve()}
+          /* escáner */
+          var sc=null;
+          var SM='qr',SU=false;
+          function startScan(m){SM=m||'qr';stopScan(1);$('#scanbox').style.display='block';
+            var F=Html5QrcodeSupportedFormats;sc=new Html5Qrcode('reader',{formatsToSupport:SM=='qr'?[F.QR_CODE]:[F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.QR_CODE],verbose:false});
+            sc.start({facingMode:'environment'},{fps:10,qrbox:{width:230,height:230}},function(t){
+              if(!sc)return;if(SM!='qr'){stopScan();try{navigator.vibrate&&navigator.vibrate(40)}catch(x){}barScan(t);return}var m=/^granja:(\d+):(solar|grupo)$/.exec(t);if(!m){return}
+              stopScan();V={n:'eq',g:+m[1],e:m[2]};try{navigator.vibrate&&navigator.vibrate(40)}catch(x){}render();window.scrollTo(0,0)
+            },function(){}).catch(function(){toast('No se pudo abrir la cámara',1);$('#scanbox').style.display='none'})}
+          function stopScan(k){var s=sc;sc=null;if(s)s.stop().then(function(){s.clear()}).catch(function(){});if(!k)$('#scanbox').style.display='none'}
+          $('#stopscan').onclick=function(){stopScan();if(SU){SU=false;$('#sh').style.display='block'}};
+          /* eventos */
+          $('#out').onclick=function(){if(confirm('¿Cerrar sesión?'))auth.signOut()};
+          $('#sh').onclick=function(e){var a=e.target.dataset.a;if(a=='save')saveReg();else if(a=='cancel')closeSh();else if(a=='gsave')saveFarm();else if(a=='gdel')delFarm();else if(a=='fsave')fSave();else if(a=='fdel')fDel();else if(a=='usescan'){SU=true;$('#sh').style.display='none';startScan('bar')}else if(a=='ud'||a=='uu'){var k=e.target.dataset.c;UT[k]=Math.max(0,(UT[k]||0)+(a=='uu'?1:-1));renderUsed()}};
+          $('#app').onclick=function(e){
+            var el=e.target.closest('[data-a]');if(!el)return;var a=el.dataset.a;
+            if(a=='login'){auth.signInWithEmailAndPassword($('#em').value.trim(),$('#pw').value).catch(function(x){toast(x.code=='auth/network-request-failed'?'Sin conexión: se necesita señal para el primer ingreso':'Correo o contraseña incorrectos',1)})}
+            else if(a=='scan')startScan();
+            else if(a=='eq'){V={n:'eq',g:+el.dataset.g,e:el.dataset.e};render();window.scrollTo(0,0)}
+            else if(a=='back'){V={n:'home'};render()}
+            else if(a=='reg')openSh(el.dataset.t);
+            else if(a=='editg')openFarm(+el.dataset.g);
+            else if(a=='fd')editDatos(el.dataset.f);
+            else if(a=='fadd')addItem(el.dataset.k);
+            else if(a=='fedit')editItem(el.dataset.i);
+            else if(a=='fdef')defComps();
+            else if(a=='go'){V={n:el.dataset.v};render();window.scrollTo(0,0)}
+            else if(a=='stscan')startScan('bar');
+            else if(a=='stnew')newRep('');
+            else if(a=='stedit')editRep(el.dataset.i);
+            else if(a=='fix')db.collection('registros').doc(el.dataset.id).update({fest:'ok',fsf:hoy(),fsp:U.email}).catch(fer);
+            else if(a=='mkpdf')mkPdf();
+            else if(a=='addg'){var n=parseInt($('#ng').value,10);if(!n||n<1){toast('Poné un número válido',1);return}
+              if(G.some(function(g){return g.numero==n})){toast('Esa granja ya existe',1);return}
+              db.collection('granjas').doc(String(n)).set({numero:n,nombre:$('#nn').value.trim()}).catch(function(x){toast('Error: '+x.message,1)});toast('Granja '+n+' agregada')}
+            else if(a=='qr'){qrPerm().then(function(){return qrSave(V.g,V.e)}).then(function(){toast('QR guardado en Documentos/Granjas/QR')}).catch(function(x){toast(x.message||'No se pudo guardar',1)})}
+            else if(a=='qrall'){qrPerm().then(function(){var p=Promise.resolve();G.forEach(function(g){['solar','grupo'].forEach(function(e){p=p.then(function(){return qrSave(g.numero,e)})})});return p}).then(function(){toast('QR guardados en Documentos/Granjas/QR')}).catch(function(x){toast(x.message||'No se pudo guardar',1)})}
+          };
+          window.addEventListener('online',render);window.addEventListener('offline',render);
+          render();
+          </script></body></html>
+          EOF
+          sed -i "s/__BUILD__/$GITHUB_RUN_NUMBER/" www/index.html
+          for f in app auth firestore; do curl -fsSL https://www.gstatic.com/firebasejs/10.14.1/firebase-$f-compat.js -o www/firebase-$f-compat.js; done
+          curl -fsSL https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js -o www/qrcode.min.js
+          curl -fsSL https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js -o www/html5-qrcode.min.js
+          curl -fsSL https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js -o www/jspdf.umd.min.js
+          npm install
+          npx cap add android
+          npx cap sync android
+          sed -i -E "s/versionCode [0-9]+/versionCode $((100+GITHUB_RUN_NUMBER))/;s/versionName \"[^\"]*\"/versionName \"1.$GITHUB_RUN_NUMBER\"/" android/app/build.gradle
+          sed -i 's#</manifest>#<uses-permission android:name="android.permission.CAMERA"/><uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/><uses-feature android:name="android.hardware.camera" android:required="false"/></manifest>#' android/app/src/main/AndroidManifest.xml
+          mkdir -p ~/.android
+          base64 -d > ~/.android/debug.keystore <<'EOF'
+          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
+          EOF
+          cd android && chmod +x gradlew && ./gradlew assembleDebug
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: Granjas ${{ github.run_number }}
+          files: android/app/build/outputs/apk/debug/app-debug.apk
